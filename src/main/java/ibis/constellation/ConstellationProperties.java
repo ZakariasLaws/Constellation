@@ -186,6 +186,16 @@ public class ConstellationProperties extends Properties {
     public final int POOLSIZE;
 
     /**
+     * The "allowLeave" property is a boolean property indicating whether nodes may leave Constellation during a run.
+     * This property only takes effect in open executions, which can be set by setting the "closed" property to false.
+     * The default of this property is "false". WARNING, Constellation is not fault-tolerant, so if a message is on
+     * the way to a node which is removed it might get lost.
+     */
+    public static final String S_ALLOW_LEAVING = S_PREFIX + "allowLeave";
+
+    public final boolean ALLOW_LEAVING;
+
+    /**
      * The "master" property is a boolean property indicating whether the current constellation instance is a candidate to be the
      * master. At least one of the constellation instances should be. See {@link Constellation#isMaster()}. The default is "true".
      * Note that only one constellation instance will actually become the master. For that instance,
@@ -219,6 +229,7 @@ public class ConstellationProperties extends Properties {
         MASTER = getBooleanProperty(S_MASTER, true);
         CLOSED = getBooleanProperty(S_CLOSED, false);
         POOLSIZE = getIntProperty(S_POOLSIZE, -1);
+        ALLOW_LEAVING = getBooleanProperty(S_ALLOW_LEAVING, false);
         DISTRIBUTED = getBooleanProperty(S_DISTRIBUTED, true);
         PROFILE = getBooleanProperty(S_PROFILE, false);
         PROFILE_COMMUNICATION = getBooleanProperty(S_PROFILE_COMMUNICATION, false);
@@ -240,6 +251,8 @@ public class ConstellationProperties extends Properties {
             logger.info("CLOSED = " + CLOSED);
             if (CLOSED) {
                 logger.info("POOLSIZE = " + POOLSIZE);
+            } else {
+                logger.info("ALLOW_LEAVING = " + ALLOW_LEAVING);
             }
             logger.info("DISTRIBUTED = " + DISTRIBUTED);
             logger.info("PROFILE = " + PROFILE);

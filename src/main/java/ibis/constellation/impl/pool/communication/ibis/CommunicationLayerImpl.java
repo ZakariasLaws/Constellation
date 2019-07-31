@@ -169,11 +169,37 @@ public class CommunicationLayerImpl implements CommunicationLayer, RegistryEvent
 
     @Override
     public void terminate() throws IOException {
+        // TODO Check if Constellation server is still active
+
+        // Check if the property to allow nodes to leave Constellation is set
+        if (!properties.CLOSED && properties.ALLOW_LEAVING){
+            pool.notifyLeavingPool();
+            return;
+        }
+
+        // Block until master is terminated
         if (local.equals(master)) {
             ibis.registry().terminate();
         } else {
             ibis.registry().waitUntilTerminated();
         }
+    }
+
+    @Override
+    public boolean end() {
+        if (!properties.CLOSED && properties.ALLOW_LEAVING){
+            try {
+                ibis.end();
+            } catch (IOException e) {
+                logger.error("Failed to leave pool");
+                return false;
+            }
+
+            logger.info("Left pool");
+            return true;
+        }
+
+        return false;
     }
 
     @Override
@@ -223,7 +249,7 @@ public class CommunicationLayerImpl implements CommunicationLayer, RegistryEvent
             ibis.end();
         } catch (IOException e) {
             if (logger.isInfoEnabled()) {
-                logger.info("ibis.end() got execption", e);
+                logger.info("ibis.end() got exception", e);
             }
         }
     }

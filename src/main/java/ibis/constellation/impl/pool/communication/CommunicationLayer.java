@@ -34,6 +34,8 @@ public interface CommunicationLayer {
 
     public void terminate() throws IOException;
 
+    public boolean end();
+
     public void cleanup();
 
     public NodeIdentifier getElectionResult(String electTag, long timeout) throws IOException;

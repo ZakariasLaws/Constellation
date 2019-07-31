@@ -63,8 +63,10 @@ public class Pool {
     private static final byte OPCODE_NOTHING = 83;
     private static final byte OPCODE_RELEASE = 84;
 
-    private static final byte OPCODE_PING = 93;
-    private static final byte OPCODE_PONG = 94;
+    private static final byte OPCODE_LEAVE_POOL = 90;
+
+    private static final byte OPCODE_PING = 100;
+    private static final byte OPCODE_PONG = 101;
 
     private DistributedConstellation owner;
 
@@ -345,6 +347,10 @@ public class Pool {
         terminated = true;
     }
 
+    public void leavePool() {
+        comm.end();
+    }
+
     public void handleProfiling() {
         if (properties.PROFILE) { // Only if profiling.
             Profiling profiling = owner.getProfiling();
@@ -476,6 +482,35 @@ public class Pool {
 
     private void registerRank(ConstellationIdentifierImpl cid, NodeIdentifier id) {
         registerRank(cid.getNodeId(), id);
+    }
+
+    private void unregisterRankMaster(RankInfo info) {
+        // Send leave notification to all members
+        for (NodeIdentifier entry : locationCache.values()) {
+            if (entry != local) {
+                doForward(entry, OPCODE_LEAVE_POOL, info);
+            }
+        }
+    }
+
+    private void unregisterRank(RankInfo info) {
+        NodeIdentifier old = locationCache.remove(info.rank);
+
+        // Notify all members of pool of unregister rank if master
+        // Collect acknowledgements from all members
+        if (isMaster) {
+            unregisterRankMaster(info);
+        }
+
+        if (logger.isInfoEnabled()) {
+            logger.info("Unregistered rank " + rank);
+        }
+
+        if (logger.isInfoEnabled()) {
+            if (old == null) {
+                logger.info("Rank already removed " + rank);
+            }
+        }
     }
 
     private NodeIdentifier lookupRank(int rank) {
@@ -665,6 +700,10 @@ public class Pool {
             lookupRankRequest((RankInfo) data);
             break;
 
+        case OPCODE_LEAVE_POOL:
+            unregisterRank((RankInfo) data);
+            break;
+
         default:
             logger.error("Received unknown message opcode: " + opcode);
             break;
@@ -760,6 +799,21 @@ public class Pool {
         }
 
         doForward(master, OPCODE_POOL_REGISTER_REQUEST, new PoolRegisterRequest(local, tag));
+    }
+
+    public void notifyLeavingPool(){
+        if (logger.isInfoEnabled()) {
+            logger.info("Notifying master of leaving pool");
+        }
+
+        RankInfo info = new RankInfo(rank, local);
+
+        // Remove from masters cache
+        if (!isMaster) {
+            doForward(master, OPCODE_LEAVE_POOL, info);
+        } else {
+            unregisterRankMaster(info);
+        }
     }
 
     private void requestUpdate(NodeIdentifier master, String tag, long timestamp) {
@@ -917,6 +971,16 @@ public class Pool {
         requestUpdate(tmp.getMaster(), tag, tmp.currentTimeStamp());
     }
 
+    public void requestUpdate() {
+        if (logger.isInfoEnabled()) {
+            logger.info("Requesting update for all pools ");
+        }
+
+        for (String pool : pools.keySet()) {
+            requestUpdate(pool);
+        }
+    }
+
     public static String getString(int opcode, String readOrWrite) {
         switch (opcode) {
         case OPCODE_EVENT_MESSAGE:
@@ -947,6 +1011,8 @@ public class Pool {
             return readOrWrite + " nothing";
         case OPCODE_RELEASE:
             return readOrWrite + " release";
+        case OPCODE_LEAVE_POOL:
+            return readOrWrite + " leave pool";
         case OPCODE_PING:
             return readOrWrite + " ping";
         case OPCODE_PONG:

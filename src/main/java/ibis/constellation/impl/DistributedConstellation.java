@@ -56,6 +56,11 @@ public class DistributedConstellation {
      */
     private final int stealStrategy;
 
+    /**
+     * Property indicating whether nodes may leave Constellation.
+     */
+    private final boolean allowLeave;
+
     /** Steal from pool steal strategy. */
     private static final int STEAL_POOL = 1;
 
@@ -450,6 +455,8 @@ public class DistributedConstellation {
 
         PROFILE_OUTPUT = props.PROFILE_OUTPUT;
 
+        allowLeave = props.ALLOW_LEAVING;
+
         // Init communication here...
         try {
             pool = new Pool(this, props);
@@ -482,11 +489,24 @@ public class DistributedConstellation {
      */
     private void performDone() {
         try {
-            // NOTE: this will proceed directly on the master. On other
-            // instances, it blocks until the master terminates.
+            // NOTE: this will proceed directly on the master.
+            // On other nodes, it will block until master exits, unless the property "allowLeaving" is set to true.
             pool.terminate();
         } catch (Throwable e) {
             logger.warn("Failed to terminate pool!", e);
+        }
+
+        if(allowLeave) {
+            // ****************************
+            // TODO Replace with a more secure way of exiting, i.e. acknowledgments from other nodes.
+            // The pool.terminate() Method will notify all other nodes that this node is leaving. Howevever, there might
+            // still be steal replies or other messages in transit after this timer ends.
+            // ****************************
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         logger.debug("Pool terminated");
@@ -503,6 +523,12 @@ public class DistributedConstellation {
             profiling.printProfile(PROFILE_OUTPUT);
         }
         pool.cleanup();
+
+        // Leave Ibis
+        if (allowLeave){
+            pool.leavePool();
+            logger.debug("Pool left");
+        }
     }
 
     /**
